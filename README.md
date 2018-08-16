@@ -1,2 +1,2 @@
 # texte-symboles
-Example d'ajout de symboles sur du texte
+Exemple d'ajout de symboles sur du texte
