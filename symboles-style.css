@@ -1,0 +1,124 @@
+
+body {
+
+	background-color: #fafafa;
+	margin: 0;
+
+
+}
+
+#divContenant {
+	position: absolute;
+	right:0;
+	left:0;
+	top: 150px;
+	height: 350px;
+	width: 710px;
+	display: block;
+	margin: auto;
+	background-color: #fefefe;
+	box-shadow: 0px 10px 15px #888888;
+	overflow-y: auto;
+	overflow-x: hidden;
+
+}
+
+#divTexte {
+	position: absolute;
+	display: inline;
+	width: 100%;
+	min-height: 100%;
+	height: auto;
+	box-sizing: border-box;
+	font-size: 28px;
+	padding: 20px;
+	cursor: text;
+	line-height: 2.2;
+	white-space: pre-wrap;
+	overflow-wrap: normal;
+	word-break: keep-all;
+	-webkit-word-break: keep-all;
+	line-break: strict;
+	text-align: justify;
+}
+
+#fenetreOptions {
+	position: absolute;
+    height: 222px;
+    width: 170px;
+    line-height: 20px;
+    background-color: lightgrey;
+    cursor: default;
+    display: inline;
+    box-sizing: border-box;
+    padding-left: 5px;
+    padding-right: 5px;
+    box-shadow: 0px 4px 8px #888888;
+    border-radius: 2px;
+    font-size: 14px;
+    font-family: Baskerville;
+    user-select: none;
+    visibility: hidden;
+    
+}
+
+#fenetreOptions div:hover {
+	background-color: grey !important;
+	color: white;
+}
+
+
+
+#fenetreSupprimer {
+    position: absolute;
+    padding: 2px;
+    left: 0;
+    top: 0;
+    width: 120px;
+    height: 20px;
+    line-height: 20px;
+    background-color: lightgrey;
+    box-shadow: 0px 4px 8px #888888;
+    cursor: default;
+    text-align: center;
+    vertical-align: middle;
+    display: table-cell;
+    user-select: none;          
+    overflow: hidden;
+    visibility:hidden;
+}
+
+#fenetreSupprimer:hover {
+	 background-color: grey !important;
+     color: white;
+}
+
+ /* COULEURS LETTRES, ERREURS */
+
+
+	svg path {
+	    pointer-events: visibleStroke;
+	    }
+
+    svg polygon {
+    pointer-events: visibleFill;
+    	}
+
+    /* pour les erreurs suivies du numéro de ID*/
+    span[class^='liob'] {color: green;}
+    span[class^='liin'] {color: red;}
+    span[class^='ench'] {color: #ff66ff;}
+    span[class^='intm'] {}
+    span[class^='intd'] {}
+    span[class^='acce'] {text-shadow: -0.7px 0px 0.00px, 0.7px 0px 0.00px, 0px -0.5px 0.00px, 0px 0.5px 0.00px;}
+    span[class^='voyo'] {color: #00cccc;}
+    span[class^='voyn'] {color: #0033cc;}
+    span[class^='cons'] {color: saddlebrown;}
+    span[class^='lemu'] {color: saddlebrown;}
+    span[class^='svoy'] {color: rgb(134, 0, 179);}
+
+	.en_avant {
+	    opacity: 1 !important;
+	    z-index: 10;
+
+	}

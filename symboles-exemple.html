@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html>   
+	<head>
+	    <title>Symboles de phonétique</title>
+	    <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+	  
+	    <link rel="stylesheet" type="text/css" href="symboles-style.css">
+	</head>
+
+	<body>
+	   <div id='divContenant'>
+	   		<div id='divTexte' contenteditable="false" spellcheck="false">Voici une version simplifiée de l'éditeur de texte d'Audiostat. Sélectionner une partie de texte pour ajouter un type d'erreur de phonétique. On peut ensuite cliquer à droite sur les symboles pour effacer une erreur ou l'effacer avec le clavier. Sur la plateforme, il est possible de modifier le texte en direct.</div>
+	   </div>
+
+	   <!-- Context menu -->
+	   <div id="fenetreOptions">
+		   <div onclick="creerExercice.surroundErreur('liob')">Liaison obligatoire</div>
+		   <div onclick="creerExercice.surroundErreur('liin')">Liaison interdite</div>
+		   <div onclick="creerExercice.surroundErreur('ench')">Enchaînement</div>
+		   <div onclick="creerExercice.surroundErreur('intm')">Intonation Montante</div>
+		   <div onclick="creerExercice.surroundErreur('intd')">Intonation Descendante</div>
+		   <div onclick="creerExercice.surroundErreur('acce')">Accentuation</div>
+		   <div onclick="creerExercice.surroundErreur('voyo')">Voyelle orale</div>
+		   <div onclick="creerExercice.surroundErreur('voyn')">Voyelle nasale</div>
+		   <div onclick="creerExercice.surroundErreur('svoy')">Semi-voyelle</div>
+		   <div onclick="creerExercice.surroundErreur('cons')">Consonne</div>
+		   <div onclick="creerExercice.surroundErreur('lemu')">Lettre muette</div>
+		</div>
+
+		<div id="fenetreSupprimer" onclick="creerExercice.supprimerErreur(creerExercice.target)">Supprimer l'erreur</div>
+	</body>
+</html>
+
+
+
+<script>
+
+	//Pour ne pas contaminer le contexte global avec des variables:
+	var creerExercice = function () {
+		var divContenant = document.getElementById('divContenant');
+		var divTexte = document.getElementById('divTexte');
+		var fenetreOptions = document.getElementById('fenetreOptions');
+		var fenetreSupprimer = document.getElementById('fenetreSupprimer');
+
+		var sel = window.getSelection();
+		var currentRange = null;
+
+		var lineHeight = Number(window.getComputedStyle(divTexte).lineHeight.slice(0,-2));
+
+		var objetErreurs = {};
+		var erreursPossibles = [];
+		var erreurIDs = [];
+		var compteurErreurs = 0;
+		var target;
+		var delai;
+		
+		/* - - - Mouse events - - - */
+
+		divTexte.onmouseup = function(event) {
+			if (!creerExercice.sel.isCollapsed) {
+				creerExercice.currentRange = creerExercice.sel.getRangeAt(0);
+				ouvrirFenetreOptions(event.clientX, event.clientY);
+			}
+		}
+
+		divTexte.onmouseout = function() {
+			if (!creerExercice.sel.isCollapsed) {
+				creerExercice.currentRange = creerExercice.sel.getRangeAt(0);
+			}
+		}
+
+		document.onmousedown = function(event) {
+			if (event.target !== fenetreOptions &&
+				event.target.parentElement !== fenetreOptions &&
+				event.target !== creerExercice.fenetreSupprimer) {
+				creerExercice.currentRange = null;
+					fermerFenetreOptions();
+					fermerFenetreSupprimer();
+			}
+		}
+
+		//Désactiver le context menu par défaut:
+		divTexte.oncontextmenu = function(event) {
+			event.preventDefault();
+			return false;
+		}
+		divContenant.oncontextmenu = function(e) {
+		    e.preventDefault();
+		    return false;
+		}
+
+
+		/* Ouvrir et fermer fenêtres */
+
+		function ouvrirFenetreOptions(x, y) {
+			//console.log("X:"+x+" Y:"+y);
+			var offsetX = 10;
+			var offsetY = 25;
+
+			var divContenantLeft = divContenant.getBoundingClientRect().left;
+			var divContenantWidth = divContenant.getBoundingClientRect().width;
+			var divContenantTop = divContenant.getBoundingClientRect().top;
+			var divContenantHeight = divContenant.getBoundingClientRect().height;
+
+			var largeurFenetre = fenetreOptions.getBoundingClientRect().width;
+			var hauteurFenetre = fenetreOptions.getBoundingClientRect().height;
+
+			var positionFenetreLeft = x + offsetX;
+			var positionFenetreTop = y + offsetY;
+
+			//Si la fenêtre dépasse en X:
+			if (largeurFenetre + positionFenetreLeft > divContenantLeft + divContenantWidth) {
+				
+				positionFenetreLeft = x - offsetX - largeurFenetre;
+			}
+
+			//Si la fenêtre dépasse en Y:
+			if (hauteurFenetre + positionFenetreTop > divContenantTop + divContenantHeight) {
+				
+				positionFenetreTop = y - offsetY - hauteurFenetre;
+			}
+			fenetreOptions.style.left = positionFenetreLeft + "px";
+			fenetreOptions.style.top = positionFenetreTop + "px";
+			fenetreOptions.style.visibility = 'visible';
+		}
+
+
+		function fermerFenetreOptions() {
+			if (creerExercice.sel) {
+				creerExercice.sel.removeAllRanges();
+			}
+    		
+			if (fenetreOptions.offsetParent) {
+				fenetreOptions.style.left = "0";
+				fenetreOptions.style.top = "0";
+				fenetreOptions.style.visibility = "hidden";
+			}
+		}
+
+
+		/* Ajouter SPAN autour de l'erreur */
+
+		function surroundErreur(type) {
+			divTexte.normalize(); //removes empty text nodes, and joins adjacent text nodes
+			effacerSpansVides(divTexte);
+
+			//Erreur sur plus de deux lignes:
+			if (creerExercice.currentRange.getBoundingClientRect().height > Math.ceil(lineHeight*2)) {
+		        console.log("Erreur sur plus de 2 lignes.");
+		        fermerFenetreOptions();
+		        return;
+    			}
+
+			
+
+			//Return si moins de 3 caractères pour liaison/enchainement:
+		    if (type === 'liob' || type === 'liin' || type === 'ench') {
+		        if (creerExercice.currentRange.toString().length < 3 ) {
+		            console.log("Moins que 3 caractères.");
+		            fermerFenetreOptions();
+		            return;
+		        }
+		    }
+
+			//Return si moins de 2 caractères pour intonation mont/desc
+		    if (type === 'intm' || type === 'intd') {
+		        if (creerExercice.currentRange.toString().length < 2) {
+		            console.log("L'intonation doit comprendre au moins 2 caractères.");
+		            fermerFenetreOptions();
+		            return;
+		        }
+		    }
+
+		    if (type === 'lemu'){
+		        if (creerExercice.currentRange.toString().length > 1) {
+		            console.log("Sélectionner une lettre à la fois");
+		            fermerFenetreOptions();
+		            return;
+		            if (!creerExercice.currentRange.toString().match(/[A-Za-z0-9\u00C0-\u00ff]/i) ) {
+		                console.log("Caractère invalide");
+		                fermerFenetreOptions();
+		                return;
+		            }
+		        }
+		    }
+
+		    if (creerExercice.currentRange != null) {
+        
+		        //Si les nodes du début ou de la fin sont contenues dans d'autres nodes qu'il est possible de sélectionner au complet (car le contenu est sélectionné au complet):
+		        //console.log("Encadre erreur");
+	            var copieRange = creerExercice.currentRange.cloneRange();
+	            var newSpan = document.createElement('span');
+	            var fragment = creerExercice.currentRange.extractContents();
+	            for (var i=0; i < fragment.childNodes.length; i++) {
+	                //console.log(fragment.childNodes[i]);
+	                //clone, sinon les nodes vont disparaitre au fur et à mesure et ça va causer des erreurs
+	                newSpan.appendChild(fragment.childNodes[i].cloneNode(true));
+	            }
+	            creerExercice.currentRange.insertNode(newSpan);
+	            newSpan.classList.add(type+compteurErreurs);
+	        
+	            //Entrer l'erreur dans objetErreurs
+	            objetErreurs[type+compteurErreurs] = {}
+	            dessinerUneErreur(type, compteurErreurs); //renvoie à la bonne fonction selon le type
+	            compteurErreurs++;
+	         
+	        
+	            //Au cas où le fait de mettre un span brise un mot sur deux lignes:
+	            if (Math.round(creerExercice.currentRange.getBoundingClientRect().left) !== Math.round(copieRange.getBoundingClientRect().left)) {
+	            //efface et remet le contenu divTexte
+	            var contenuDivTexte = divTexte.innerHTML;
+	            divTexte.innerHTML = contenuDivTexte;    
+	            toutRedessiner();
+	            }
+        
+        }
+	    //console.log("fin de surroundErreur");
+	    fermerFenetreOptions();
+
+		}
+
+
+
+		//efface tous les spans vides en commençant par la fin
+	    function effacerSpansVides(contenant) {
+	        var spans = contenant.getElementsByTagName('span');
+	        for (var i=spans.length-1; i >= 0; i--) {
+	            if (spans[i].textContent == "" || spans[i].getBoundingClientRect().width < 2) {
+	                spans[i].outerHTML = spans[i].innerHTML;
+	            }
+	        }
+	    }
+
+
+
+	    //fonction qui retourne un array de toutes les textnodes sous-jacentes dans chaque span que comprend l'erreur:
+		function flattenErreur(key) {
+		    //Éventuellement, créer un treeWalker
+		    var spans = divTexte.getElementsByClassName(key);
+		    var result = [];
+		    for (var i=0; i < spans.length; i++) {
+		        if (spans[i].getBoundingClientRect().width > 2) {
+		            pushChildren(spans[i]);
+		        }
+		    }
+		        //fonction récursive
+		        function pushChildren(el) {
+		            for (var i=0; i < el.childNodes.length; i++) {
+		                if (!el.childNodes[i].hasChildNodes()) { //si aucun childNode
+		                    if (el.childNodes[i].nodeName == '#text') {
+		                    result.push(el.childNodes[i]);
+		                        //console.log(el.childNodes[i].nodeValue);
+		                    } else {continue;}
+		                } else { //s'il a des childnodes, recommencer pushChildren
+		                    pushChildren(el.childNodes[i]);
+		                }
+		            }
+		        }
+		    
+		    return result;
+		}
+
+
+		//Fonction qui retourne le premier range non-nul d'une erreur
+		function premierRangeNonNulErreur(flattenedArray) {
+		    var range = document.createRange();
+		    //retourne le premier RANGE non-nul, sinon retourne -1 (si node vide ou pas trouvé dedans):
+		    //fonction récursive
+		    function premierRangeNonNulNode(textNode, pos) {
+		        var len = textNode.length;
+		        if (len === 0) {
+		            return -1;
+		        }
+		        if (pos+1 > len) {
+		            return -1;
+		        }
+
+		        range.setStart(textNode, pos);
+		        range.setEnd(textNode, pos+1);
+		        if (range.getBoundingClientRect().width > 2 ) {
+		            return range;
+		        } else {
+		            return premierRangeNonNulNode(textNode, pos+1);
+		        }
+		    }
+
+		    for (var i=0; i < flattenedArray.length; i++) {
+		        //premier caractère à partir du début (0):
+		        var premierRangeErreur = premierRangeNonNulNode(flattenedArray[i], 0);
+		        if (premierRangeErreur === -1) {
+		            continue;
+		        } else {
+		            //console.log("index textnode:"+i);
+		            //console.log(premierRangeErreur.toString());
+		            return premierRangeErreur;
+		        }
+		    }
+		    return false; //il n'a rien trouvé
+		}
+
+
+
+
+		//Fonction qui retourne le dernier range non-nul d'une erreur
+		function dernierRangeNonNulErreur(flattenedArray) {
+		    var range = document.createRange();
+		    //retourne le premier RANGE non-nul, sinon retourne -1 (si node vide ou pas trouvé dedans):
+		    //fonction récursive
+		    function dernierRangeNonNulNode(textNode, pos) {
+		        //console.log(pos);
+		        if (textNode.length === 0) {
+		            return -1;
+		        }
+		        if (pos-1 < 0) {
+		            return -1;
+		        }
+
+		        range.setStart(textNode, pos-1);
+		        range.setEnd(textNode, pos);
+		        if (range.getBoundingClientRect().width > 2 ) {
+		            return range;
+		        } else {
+		            return dernierRangeNonNulNode(textNode, pos-1);
+		        }
+		    }
+
+		    for (var i=flattenedArray.length-1; i >= 0; i--) {
+		        //premier caractère à partir du début (0):
+		        var dernierRangeErreur = dernierRangeNonNulNode(flattenedArray[i], flattenedArray[i].length);
+		        if (dernierRangeErreur === -1) {
+		            continue;
+		        } else {
+		            return dernierRangeErreur;
+		        }
+		    }
+		    return false; //il n'a rien trouvé
+		}
+		    
+		//Trouve des ranges valides entre deux lignes
+		function boutDeLigne(firstRange, firstRangeBottom, lastRange, lastRangeBottom, flattenedArray) {
+		    var testRange = firstRange.cloneRange();
+		    var previousRange;
+		    
+		    var finPremiere = -1;
+		    var debutDeuxieme = -1;
+		    
+		    
+		    for (var i=0; i < flattenedArray.length; i++) {
+		        var j = 0;
+		        if (i===0) {j = firstRange.startOffset;}
+		        
+		        for (j;j < flattenedArray[i].length; j++) {
+		            testRange.setStart(flattenedArray[i], j);
+		            testRange.setEnd(flattenedArray[i], j+1);
+		            var testRangeBottom = testRange.getBoundingClientRect().bottom;
+		            
+
+		            if (finPremiere === -1 && testRangeBottom > firstRangeBottom) {
+		                finPremiere = previousRange;
+		            }
+		            
+		            if (testRangeBottom === lastRangeBottom && debutDeuxieme === -1) {
+		                debutDeuxieme = testRange;
+		                return {
+		                    finPremiere: finPremiere,
+		                    debutDeuxieme: debutDeuxieme
+		                };
+		            }
+		            
+		            previousRange = testRange.cloneRange();
+
+		        }
+		    }
+		    return false;
+		}
+
+
+
+	    function dessinerUneErreur(type, id) {
+		    switch(type) {
+		        case 'liob':
+		        case 'liin':
+		        case 'ench':
+		            return creerLiaisonEnchainement(type, id);
+		        break;
+		        case 'intm':
+		        case 'intd':
+		            return creerIntonation(type, id);
+		        break;
+		        case 'acce':
+		        case 'voyo':
+		        case 'voyn':
+		        case 'svoy':
+		        case 'cons':
+		            return creerSouligner(type, id);
+		        break;
+		        case 'lemu':
+		            return creerLettreMuette(type, id);
+		        break;       
+		    }
+		}
+
+		function dessinerErreurs() {
+		    for (var x in objetErreurs) {
+		        var type =x.substring(0,4);
+		        var id =x.substring(4);
+		        dessinerUneErreur(type, id);
+		    }
+		}  
+
+		//réinsère tout le texte dans divTexte, re-lit tout le contenu, efface les svg, recrée objetErreurs et redessine tout
+		function toutRedessiner() {
+		        console.log("********tout redessiner********")
+		        
+		        //console.log("refresh erreurs");
+		        //clear objetErreurs:
+		        objetErreurs = {};
+		        compteurErreurs = 0;
+		        //effacer tous les svg
+		        var divs = divContenant.getElementsByTagName('div');
+		            for (var i=divs.length-1; i > 0; i--) {
+		                divContenant.removeChild(divs[i]);
+		            }
+		            fermerFenetreOptions();
+		            fermerFenetreSupprimer();
+		        creerObjetErreurs();
+		        dessinerErreurs();
+
+		    }
+
+
+		    
+		function creerObjetErreurs() {
+		    var spans = divTexte.getElementsByTagName('span');
+		    
+		    //loop à travers les spans
+		    for (var i=0; i < spans.length; i++) {
+		        var nomErreur = spans[i].classList[0];
+		        var numero = Number(nomErreur.substring(4));
+
+		        objetErreurs[nomErreur] = objetErreurs[nomErreur] || {};
+
+		        if (erreurIDs.indexOf(numero) === -1) {
+		            erreurIDs.push(numero);
+		        }
+		        erreurIDs.sort(function(a,b) {
+		            return a-b;
+		        });
+		        compteurErreurs = erreurIDs[erreurIDs.length-1]+1;
+		    }
+		}
+
+
+		function creerLiaisonEnchainement(type, id) {
+		    //Vérifier si l'erreur est sur 1 ou 2 lignes
+		    //Si elle est sur trois lignes, return false
+		    //À updater si on resize la fenêtre:
+		    var divContenantTop = divContenant.getBoundingClientRect().top;    
+		    var divContenantLeft = divContenant.getBoundingClientRect().left;
+		    
+		    //var spans = divTexte.getElementsByClassName(type+id);
+		    var flattenedArray = flattenErreur(type+id);
+		    
+		    var premierRange = premierRangeNonNulErreur(flattenedArray);
+		    var dernierRange = dernierRangeNonNulErreur(flattenedArray);
+		    
+		    var scrollTop = divContenant.scrollTop;
+		    var offsetTop = -5;
+
+		    //la valeur bottom correspond au top + height, pas à la distance en bas!
+		    var premierRangeBottom  = premierRange.getBoundingClientRect().bottom;
+		    var dernierRangeBottom = dernierRange.getBoundingClientRect().bottom;
+		    var premierRangeLeft = premierRange.getBoundingClientRect().left;
+		    var dernierRangeLeft = dernierRange.getBoundingClientRect().left;
+		    var premierRangeWidth = premierRange.getBoundingClientRect().width;
+		    var dernierRangeWidth = dernierRange.getBoundingClientRect().width;
+		    
+		    var widthTotale;
+		    var lineBreak = null; //objet
+		    var couleur;
+		    
+		    if (type === 'liob') {couleur = "rgb(0, 128, 0)";}
+		    if (type === 'liin') {couleur = "rgb(255, 0, 0)";}
+		    if (type === 'ench') {couleur = "rgb(255, 102, 255)";}
+		    
+		    //erreur sur une ligne
+		    if (premierRangeBottom === dernierRangeBottom) {
+		        console.log("Erreur sur 1 ligne.");
+		        
+		        widthTotale = dernierRangeLeft - premierRangeLeft - premierRangeWidth/2 + dernierRangeWidth/2;
+		        
+		        var div0 = document.createElement('div');
+		        div0.id = type+id+'_'+0;
+		        div0.style.position = "absolute";
+		        div0.style.pointerEvents = "none";
+		        div0.style.top = premierRangeBottom - divContenantTop + offsetTop +scrollTop + "px";
+		        div0.style.height = "15px";
+		        div0.style.width = widthTotale + "px";
+		        div0.style.left = premierRangeLeft - divContenantLeft + premierRangeWidth/2 + "px";
+		        divContenant.appendChild(div0);
+		        
+		        var svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+		        svg.setAttribute("preserveAspectRatio", "none");
+		        svg.setAttribute("width", "100%");
+		        svg.setAttribute("height", "100%");
+		        svg.style.position = "absolute";
+		        div0.appendChild(svg);
+		        
+		        var courbeBlanche = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbeBlanche.setAttribute("d", "M2,2 C2,12 "+(div0.offsetWidth-2)+",12 "+(div0.offsetWidth-2)+",2");
+		        courbeBlanche.setAttribute("stroke","white");
+		        courbeBlanche.setAttribute("stroke-width","5");
+		        courbeBlanche.setAttribute("fill","none");
+		        courbeBlanche.style.pointerEvents="visibleStroke";
+		        svg.appendChild(courbeBlanche);
+		        
+		        var courbe = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbe.setAttribute("d", "M2,2 C2,12 "+(div0.offsetWidth-2)+",12 "+(div0.offsetWidth-2)+",2");
+		        courbe.setAttribute("stroke",couleur);
+		        courbe.setAttribute("stroke-width","2");
+		        courbe.setAttribute("fill","none");
+		        courbe.setAttribute("stroke-dasharray", "3,1.5");
+		        courbe.style.pointerEvents = "visibleStroke";
+		        svg.appendChild(courbe);
+		        
+		        //Ajouter référence au div(svg):
+		        objetErreurs[type+id].div0 = div0;
+		        
+		    } else {
+		    //erreur pas sur la même ligne
+		        console.log("Erreur sur deux lignes.");
+		        //Trouver le dernierCaractere de la premier ligne
+		        lineBreak = boutDeLigne(premierRange, premierRangeBottom, dernierRange, dernierRangeBottom, flattenedArray);
+		        
+		        //.right est .left + .width, PAS la distance à partir de la droite!
+		        var premiereLigneWidth = lineBreak.finPremiere.getBoundingClientRect().right - premierRangeLeft;        
+		        var derniereLigneWidth = dernierRange.getBoundingClientRect().right - lineBreak.debutDeuxieme.getBoundingClientRect().left;
+
+		        widthTotale = premiereLigneWidth + derniereLigneWidth;
+		        
+		        //Première partie:
+		        
+		        var div0 = document.createElement('div');
+		        div0.id = type+id+'_'+0;
+		        div0.style.position = "absolute";
+		        div0.style.pointerEvents = "none";
+		        div0.style.top = premierRangeBottom - divContenantTop + offsetTop +scrollTop + "px";
+		        div0.style.height = "15px";
+		        div0.style.width = widthTotale + "px";
+		        div0.style.left = premierRangeLeft - divContenantLeft + premierRangeWidth/2 + "px";
+		        divContenant.appendChild(div0);
+		        
+		        var svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+		        svg.setAttribute("preserveAspectRatio", "none");
+		        svg.setAttribute("width", "100%");
+		        svg.setAttribute("height", "100%");
+		        svg.style.position = "absolute";
+		        div0.appendChild(svg);
+		        
+		        var clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+		        clipPath.setAttribute("id", "clipPath"+id);
+		        svg.appendChild(clipPath);
+
+		        var rectangle = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+		        rectangle.setAttribute("x",0);
+		        rectangle.setAttribute("y",0);
+		        rectangle.setAttribute("width", premiereLigneWidth+10);
+		        rectangle.setAttribute("height", div0.offsetHeight);
+		        rectangle.style.pointerEvents = "visibleFill";
+		        clipPath.appendChild(rectangle);
+		        
+		        var courbeBlanche = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbeBlanche.setAttribute("d", "M2,2 C2,12 "+(div0.offsetWidth-2)+",12 "+(div0.offsetWidth-2)+",2");
+		        courbeBlanche.setAttribute("stroke","white");
+		        courbeBlanche.setAttribute("stroke-width","5");
+		        courbeBlanche.setAttribute("fill","none");
+		        courbeBlanche.style.pointerEvents="visibleStroke";
+		        courbeBlanche.setAttribute("clip-path", "url(#clipPath"+id+")");
+		        svg.appendChild(courbeBlanche);
+		        
+		        var courbe = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbe.setAttribute("d", "M2,2 C2,12 "+(div0.offsetWidth-2)+",12 "+(div0.offsetWidth-2)+",2");
+		        courbe.setAttribute("stroke",couleur);
+		        courbe.setAttribute("stroke-width","2");
+		        courbe.setAttribute("fill","none");
+		        courbe.setAttribute("stroke-dasharray", "3,1.5");
+		        courbe.style.pointerEvents = "visibleStroke";
+		        courbe.setAttribute("clip-path", "url(#clipPath"+id+")");
+		        svg.appendChild(courbe);
+		        
+		        //Deuxième partie:
+		        var div1 = document.createElement('div');
+		        div1.id = type+id+'_'+1;
+		        div1.style.position = "absolute";
+		        div1.style.pointerEvents = "none";
+		        div1.style.top = dernierRangeBottom - divContenantTop + offsetTop +scrollTop + "px";
+		        div1.style.height = "15px";
+		        div1.style.width = widthTotale + "px";
+		        div1.style.left = dernierRangeLeft - divContenantLeft + dernierRangeWidth/2 - widthTotale + "px";
+		        divContenant.appendChild(div1);
+		        
+		        var svg1 = document.createElementNS("http://www.w3.org/2000/svg","svg");
+		        svg1.setAttribute("preserveAspectRatio", "none");
+		        svg1.setAttribute("width", "100%");
+		        svg1.setAttribute("height", "100%");
+		        svg1.style.position = "absolute";
+		        div1.appendChild(svg1);
+		        
+		        var clipPath1 = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+		        clipPath1.setAttribute("id", "clipPath1_"+id);
+		        svg1.appendChild(clipPath1);
+
+		        var rectangle1 = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+		        rectangle1.setAttribute("x", widthTotale - derniereLigneWidth - 10);
+		        rectangle1.setAttribute("y",0);
+		        rectangle1.setAttribute("width", derniereLigneWidth+10);
+		        rectangle1.setAttribute("height", div1.offsetHeight);
+		        rectangle1.style.pointerEvents = "visibleFill";
+		        clipPath1.appendChild(rectangle1);
+		        
+		        var courbeBlanche1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbeBlanche1.setAttribute("d", "M2,2 C2,12 "+(div1.offsetWidth-2)+",12 "+(div1.offsetWidth-2)+",2");
+		        courbeBlanche1.setAttribute("stroke","white");
+		        courbeBlanche1.setAttribute("stroke-width","5");
+		        courbeBlanche1.setAttribute("fill","none");
+		        courbeBlanche1.style.pointerEvents="visibleStroke";
+		        courbeBlanche1.setAttribute("clip-path", "url(#clipPath1_"+id+")");
+		        svg1.appendChild(courbeBlanche1);
+		        
+		        var courbe1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        courbe1.setAttribute("d", "M2,2 C2,12 "+(div1.offsetWidth-2)+",12 "+(div1.offsetWidth-2)+",2");
+		        courbe1.setAttribute("stroke",couleur);
+		        courbe1.setAttribute("stroke-width","2");
+		        courbe1.setAttribute("fill","none");
+		        courbe1.setAttribute("stroke-dasharray", "3,1.5");
+		        courbe1.style.pointerEvents = "visibleStroke";
+		        courbe1.setAttribute("clip-path", "url(#clipPath1_"+id+")");
+		        svg1.appendChild(courbe1);
+		        
+		        //Ajouter référence au div(svg):
+		        objetErreurs[type+id].div0 = div0;
+		        objetErreurs[type+id].div1 = div1;
+		    }  
+		    
+		    if (type === 'liin') {
+		        var div2 = document.createElement('div');
+		        div2.id = type+id+'_'+2;
+		        div2.style.position = 'absolute';
+		        div2.style.pointerEvents = 'none';
+		        div2.style.top = premierRange.getBoundingClientRect().top - divContenantTop + scrollTop - 12 + "px";
+		        div2.style.height = '17px';
+		        div2.style.width = '17px';
+		        div2.style.left = div0.offsetLeft + div0.offsetWidth/2 - 8.5 + "px";
+		        divContenant.appendChild(div2);
+		    
+		        var svg2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		        svg2.setAttribute("preserveAspectRatio", "none");
+		        svg2.setAttribute("width","100%");
+		        svg2.setAttribute("height","100%");
+		        svg2.style.position = "absolute";
+		        div2.appendChild(svg2);
+		        
+		        var cercle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+		        cercle.setAttribute("cx", div2.offsetWidth/2);
+		        cercle.setAttribute("cy", "7.5");
+		        cercle.setAttribute("r","7.5");
+		        cercle.setAttribute("fill", "red");
+		        cercle.style.position = "absolute";
+		        cercle.style.pointerEvents = "visibleFill";
+		        svg2.appendChild(cercle);
+		        
+		        var barre = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+		        barre.setAttribute("width","10");
+		        barre.setAttribute("height","4");
+		        barre.setAttribute("x", div2.offsetWidth/2 - 5);
+		        barre.setAttribute("y","5.5");
+		        barre.setAttribute("fill","white");
+		        barre.style.position = "absolute";
+		        barre.style.pointerEvents = "visibleFill";
+		        svg2.appendChild(barre);
+		        
+		        //Ajouter référence au div(svg):
+		        objetErreurs[type+id].div2 = div2
+		    
+		    }
+		    //Souris et click droit:
+		    if (svg) {
+		        svg.style.cursor = 'default';
+		        svg.oncontextmenu = function(event) {
+		            //console.log(event);
+		            ouvrirFenetreSupprimer(event.target);
+		        }
+		        svg.onmouseover = function(){mettreErreurDevant(type, id);}
+		        svg.onmouseout = function(){enleverErreurDevant(type, id);}
+		    }
+		    
+		    if (svg1) {
+		        svg1.style.cursor = 'default';
+		        svg1.oncontextmenu = function(event) {
+		            ouvrirFenetreSupprimer(event.target);
+		        }
+		        svg1.onmouseover = function(){mettreErreurDevant(type, id);}
+		        svg1.onmouseout = function(){enleverErreurDevant(type, id);}
+		    }
+		    
+		    if (svg2) {
+		        svg2.style.cursor = 'default';
+		        svg2.oncontextmenu = function(event) {
+		            ouvrirFenetreSupprimer(event.target);
+		        }
+		        svg2.onmouseover = function(){mettreErreurDevant(type, id);}
+		        svg2.onmouseout = function(){enleverErreurDevant(type, id);}
+		    }
+		    
+		    
+		    //test pour hover sur spans
+		    var spans = divTexte.getElementsByClassName(type+id);
+		    for (var i=0; i < spans.length; i++) {
+		        spans[i].onmouseover = function(event) {
+		        	event.stopPropagation();mettreErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4));
+		        }
+		        spans[i].onmouseout = function(event) {
+		        	event.stopPropagation();enleverErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4), event.target.classList[0].slice(4));
+		        }
+		    
+		    }
+		     
+		} //fin creerLiaisonEnchainement
+
+
+
+
+
+		function creerIntonation(type, id) {
+		    //console.log("intonation "+type+" "+id);
+		    var divContenantTop = divContenant.getBoundingClientRect().top;    
+		    var divContenantLeft = divContenant.getBoundingClientRect().left;
+		    
+		    //var spans = divTexte.getElementsByClassName(type+id);
+		    var flattenedArray = flattenErreur(type+id);
+		    
+		    var premierRange = premierRangeNonNulErreur(flattenedArray);
+		    var dernierRange = dernierRangeNonNulErreur(flattenedArray);
+		    
+		    var scrollTop = divContenant.scrollTop;
+		    
+		    var premierRangeTop  = premierRange.getBoundingClientRect().top;
+		    var dernierRangeTop = dernierRange.getBoundingClientRect().top;
+		    var premierRangeBottom  = premierRange.getBoundingClientRect().bottom;
+		    var dernierRangeBottom = dernierRange.getBoundingClientRect().bottom;
+		    var premierRangeLeft = premierRange.getBoundingClientRect().left;
+		    var dernierRangeRight = dernierRange.getBoundingClientRect().right;
+		    
+		    var widthTotale;
+		    var lineBreak;
+		    var premiereLigneWidth;
+		    var derniereLigneWidth;
+		    var couleur = type === 'intm' ? "rgb(0, 128, 0)" : "rgb(255, 0, 0)";
+		    
+		    
+		    //Est-ce que l'erreur est sur deux lignes:
+		    if (premierRangeBottom === dernierRangeBottom) {
+		        widthTotale = dernierRangeRight - premierRangeLeft;
+		    } else {
+		        lineBreak = boutDeLigne(premierRange, premierRangeBottom, dernierRange, dernierRangeBottom, flattenedArray);
+		        premiereLigneWidth = lineBreak.finPremiere.getBoundingClientRect().right - premierRangeLeft;   
+		        derniereLigneWidth = dernierRange.getBoundingClientRect().right - lineBreak.debutDeuxieme.getBoundingClientRect().left;
+		        widthTotale = premiereLigneWidth + derniereLigneWidth;
+		    }
+		    
+		    
+		    
+		    var div0 = document.createElement('div');
+		    div0.id = type+id+'_'+0;
+		    div0.style.position = 'absolute';
+		    div0.style.pointerEvents = "none";
+		    div0.style.top = premierRangeTop - divContenantTop -22 + scrollTop + 'px';
+		    div0.style.left = premierRangeLeft - divContenantLeft + 'px';
+		    div0.style.height = '25px';
+		    div0.style.width = widthTotale + 'px';
+		    divContenant.appendChild(div0);
+
+		    var lC = (div0.offsetWidth-8)/100;//largeur de la courbe
+		    var imageFleche = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		    imageFleche.setAttribute("preserveAspectRatio", "none");
+		    imageFleche.setAttribute("width", "100%");
+		    imageFleche.setAttribute("height", "105%");
+		    imageFleche.style.position = "absolute";
+		    div0.appendChild(imageFleche);
+
+		    var triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+		    triangle.setAttribute("points", "0,8 10,8 5,0");
+		    triangle.setAttribute("style", "fill:"+couleur);
+		    imageFleche.appendChild(triangle);
+
+
+		    var pointsqueue = "M "+100*lC+",0 C "+100*lC+",0 "+97.388292*lC+",2.5941 "+95.873732*lC+",3.6212 "+93.892115*lC+",4.965 "+91.702463*lC+",6.0068 "+89.47462*lC+",6.8839 "+86.934532*lC+",7.8839 "+84.257558*lC+",8.5085 "+81.600889*lC+",9.1364 "+77.640155*lC+",10.0726 "+73.624398*lC+",10.7765 "+69.600889*lC+",11.389 "+61.073105*lC+",12.6871 "+52.499262*lC+",13.7397 "+43.898476*lC+",14.3991 "+29.298769*lC+",15.5184 0,16 0,16";
+
+		    var queue = document.createElementNS("http://www.w3.org/2000/svg", "path");            
+		    queue.setAttribute("d",pointsqueue);
+
+
+		    var ligneBlanche = document.createElementNS("http://www.w3.org/2000/svg", "path");            
+		    ligneBlanche.setAttribute("d",pointsqueue);
+		    ligneBlanche.setAttribute("transform", "translate(0, 8)");
+		    ligneBlanche.setAttribute("stroke", "white");
+		    ligneBlanche.setAttribute("stroke-width","5");
+		    ligneBlanche.setAttribute("fill","none");
+		    imageFleche.appendChild(ligneBlanche);
+
+		    var deltaX =  lC*(100-95.873732);
+		    var deltaY = 3.6212;
+
+		    var angleRotation = (Math.atan(deltaX/deltaY)*180/Math.PI)*0.9;
+		    triangle.setAttribute("transform","translate("+(div0.offsetWidth-13)+", 0) rotate("+angleRotation+", 5, 8)");
+		    queue.setAttribute("transform", "translate(0, 8)");
+		    queue.setAttribute("stroke", couleur);
+		    queue.setAttribute("stroke-width","2");
+		    queue.setAttribute("fill","transparent");
+		    queue.setAttribute("stroke-dasharray","3,2");
+		    imageFleche.appendChild(queue);
+
+		    if (type === 'intd') {
+		        imageFleche.setAttribute("transform","scale(1, -1)");    
+		         
+		    }
+
+		    //rentrer dans objetErreurs:
+		    objetErreurs[type+id].div0 = div0;
+		    
+		    //souris et click droit:
+		    imageFleche.style.cursor = "default";
+		    imageFleche.oncontextmenu = function(event) {
+		            ouvrirFenetreSupprimer(event.target);    
+		            }
+		    imageFleche.onmouseover = function(){mettreErreurDevant(type, id);};
+		    imageFleche.onmouseout = function(){enleverErreurDevant(type, id);};
+		    
+		    
+		    if (premierRangeBottom !== dernierRangeBottom) { 
+		    //Rajouter toute la deuxième partie:
+		        
+		        var div1 = document.createElement('div');
+		        //div0.id = type+id+'_'+0;
+		        div1.style.position = 'absolute';
+		        div1.style.pointerEvents = "none";
+		        div1.style.top = dernierRangeTop - divContenantTop -22 + scrollTop + 'px';
+		        div1.style.left = dernierRangeRight - divContenantLeft - widthTotale + 'px';
+		        div1.style.height = '25px';
+		        div1.style.width = widthTotale + 'px';
+		        divContenant.appendChild(div1);
+
+		        //var lC = (div1.offsetWidth-8)/100;
+		        var imageFleche1 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		        imageFleche1.setAttribute("preserveAspectRatio", "none");
+		        imageFleche1.setAttribute("width", "100%");
+		        imageFleche1.setAttribute("height", "105%");
+		        imageFleche1.style.position = "absolute";
+		        imageFleche1.style.overflow = 'visible';
+		        div1.appendChild(imageFleche1);
+
+		        var g1 = document.createElementNS("http://www.w3.org/2000/svg", "g");
+		        var gFond1 = document.createElementNS("http://www.w3.org/2000/svg", "g");
+		        var triangle1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+		        triangle1.setAttribute("points", "0,8 10,8 5,0");
+		        triangle1.setAttribute("style", "fill:"+couleur);
+
+
+		        var triangleBlanc1 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+		        triangleBlanc1.setAttribute("points", "-3.5,10 13.5,10 5,-3");
+		        triangleBlanc1.setAttribute("style", "fill:white");
+
+		       
+		        
+		        var queue1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        queue1.setAttribute("d",pointsqueue);
+
+		        var ligneBlanche1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		        ligneBlanche1.setAttribute("d", pointsqueue);
+		        ligneBlanche1.setAttribute("transform", "translate(0, 8)");
+		        ligneBlanche1.setAttribute("stroke", "white");
+		        ligneBlanche1.setAttribute("stroke-width","5");
+		        ligneBlanche1.setAttribute("fill","none");
+
+
+		        //var angleRotation = (Math.atan(deltaX/deltaY)*180/Math.PI)*0.9;
+		        triangle1.setAttribute("transform","translate("+(div1.offsetWidth-13)+", 0) rotate("+angleRotation+", 5, 8)");
+		        triangleBlanc1.setAttribute("transform","translate("+(div1.offsetWidth-13)+", 0) rotate("+angleRotation+", 5, 8)");
+		        queue1.setAttribute("transform", "translate(0, 8)");
+		        queue1.setAttribute("stroke", couleur);
+		        queue1.setAttribute("stroke-width","2");
+		        queue1.setAttribute("fill","transparent");
+		        queue1.setAttribute("stroke-dasharray","3,2");
+
+		        gFond1.appendChild(ligneBlanche1);
+		        gFond1.appendChild(triangleBlanc1);
+
+		        g1.appendChild(queue1);
+		        g1.appendChild(triangle1);
+
+		        imageFleche1.appendChild(gFond1);
+		        imageFleche1.appendChild(g1);
+
+		        if (type === 'intd') {
+		            imageFleche1.setAttribute("transform","scale(1, -1)");        
+		        }
+		    
+		        //rentrer dans objetErreurs:
+		        objetErreurs[type+id].div1 = div1;
+
+		        //souris et click droit:
+		        imageFleche1.style.cursor = "default";
+		        imageFleche1.oncontextmenu = function(event) {
+		                ouvrirFenetreSupprimer(event.target);    
+		                }
+		        imageFleche1.onmouseover = function(){mettreErreurDevant(type, id);};
+		        imageFleche1.onmouseout = function(){enleverErreurDevant(type, id);};
+		    
+		    }
+		     
+		} //fin creerIntonation
+
+		function creerSouligner(type, id) {
+		    //console.log("souligner "+type+" "+id);
+		    var hauteur = 4;
+		    var epaisseur = 4;
+		    var couleur;
+		    var espaceTop = 1;
+		    if (type == 'acce') {
+		        couleur = 'black';
+		        espaceTop = -3;
+		        hauteur = 3;
+		        epaisseur = 3;
+		    }
+
+		    if (type == 'voyo') {couleur = "rgb(0, 204, 204)";}
+		    if (type == 'voyn') {couleur = "rgb(0, 51, 204)";}
+		    if (type == 'svoy') {couleur = 'rgb(134, 0, 179)';}
+		    if (type == 'cons') {couleur = "rgb(139, 69, 19)";} 
+		    
+		    var divContenantTop = divContenant.getBoundingClientRect().top;    
+		    var divContenantLeft = divContenant.getBoundingClientRect().left;
+		    //var spans = divTexte.getElementsByClassName(type+id);
+		    var flattenedArray = flattenErreur(type+id);
+		    var premierRange = premierRangeNonNulErreur(flattenedArray);
+		    var dernierRange = dernierRangeNonNulErreur(flattenedArray);
+		    var scrollTop = divContenant.scrollTop;
+		    //la valeur bottom correspond au top + height, pas à la distance en bas!
+		    var premierRangeBottom  = premierRange.getBoundingClientRect().bottom;
+		    var dernierRangeBottom = dernierRange.getBoundingClientRect().bottom;
+		    
+		    var premierRangeLeft = premierRange.getBoundingClientRect().left;
+		    var dernierRangeRight = dernierRange.getBoundingClientRect().right;
+		    
+		    var widthTotale = dernierRange.getBoundingClientRect().right - premierRange.getBoundingClientRect().left;
+		    
+		    if (premierRangeBottom === dernierRangeBottom) {
+		        //même ligne:
+		        var div0 = document.createElement('div');
+		        div0.style.position = 'absolute';
+		        div0.id = type+id+'_'+0;
+		        div0.style.cursor = 'default';
+		        div0.style.width =  widthTotale + "px";
+		        div0.style.left = premierRangeLeft - divContenantLeft + "px";
+		        div0.style.top = premierRangeBottom - divContenantTop + scrollTop + espaceTop + "px";
+		        div0.style.height = hauteur + "px";
+		        div0.style.boxSizing = "border-box";
+		        div0.style.borderBottom = epaisseur + "px solid "+couleur;
+		        divContenant.appendChild(div0);    
+		        
+		        //rentrer dans objetErreurs:
+		        objetErreurs[type+id].div0 = div0;
+		        objetErreurs[type+id].niveau = 1;
+		    } else {
+		        //Trouver le dernierCaractere de la premier ligne
+		        lineBreak = boutDeLigne(premierRange, premierRangeBottom, dernierRange, dernierRangeBottom, flattenedArray);
+		        //.right est .left + .width, PAS la distance à partir de la droite!
+		        var premiereLigneWidth = lineBreak.finPremiere.getBoundingClientRect().right - premierRangeLeft;        
+		        var derniereLigneWidth = dernierRangeRight - lineBreak.debutDeuxieme.getBoundingClientRect().left;
+		        
+		        //console.log("dernierRange.getBoundingClientRect().right");
+		        //console.log(dernierRange.getBoundingClientRect().right);
+		        //console.log("lineBreak.debutDeuxieme.getBoundingClientRect().left");
+		        //console.log(lineBreak.debutDeuxieme.getBoundingClientRect().left);
+		        widthTotale = premiereLigneWidth + derniereLigneWidth;
+		        
+		        //première partie:
+		        var div0 = document.createElement('div');
+		        div0.style.position = 'absolute';
+		        div0.id = type+id+'_'+0;
+		        div0.style.cursor = 'default';
+		        div0.style.width =  premiereLigneWidth + 10 + "px";
+		        div0.style.left = premierRangeLeft - divContenantLeft + "px";
+		        div0.style.top = premierRangeBottom - divContenantTop + scrollTop + espaceTop + "px";
+		        div0.style.height = hauteur + "px";
+		        div0.style.boxSizing = "border-box";
+		        div0.style.borderBottom = epaisseur + "px solid "+couleur;
+		        divContenant.appendChild(div0);   
+		        
+		        //deuxième partie:
+		        var div1 = document.createElement('div');
+		        div1.style.position = 'absolute';
+		        div1.id = type+id+'_'+1;
+		        div1.style.cursor = 'default';
+		        div1.style.width =  derniereLigneWidth + 10 + "px";
+		        div1.style.left = lineBreak.debutDeuxieme.getBoundingClientRect().left - 10 - divContenantLeft + "px";
+		        div1.style.top = dernierRangeBottom - divContenantTop + scrollTop + espaceTop + "px";
+		        div1.style.height = hauteur + "px";
+		        div1.style.boxSizing = "border-box";
+		        div1.style.borderBottom = epaisseur + "px solid "+couleur;
+		        divContenant.appendChild(div1);  
+		        
+		        //rentrer dans objetErreurs:
+		        objetErreurs[type+id].div0 = div0;
+		        objetErreurs[type+id].div1 = div1;
+		        objetErreurs[type+id].niveau = 1;
+		        
+		    }
+		    
+		    //souris et click droit:
+		    div0.style.cursor = "default";
+		    div0.oncontextmenu = function(event) {
+		        ouvrirFenetreSupprimer(event.target);
+		        }
+		    div0.onmouseover = function(){mettreErreurDevant(type, id);};
+		    div0.onmouseout = function(){enleverErreurDevant(type, id);};
+		    
+		    if (div1) {
+		        div1.style.cursor = "default";
+		        div1.oncontextmenu = function(event) {
+		            ouvrirFenetreSupprimer(event.target);
+		            }
+		        div1.onmouseover = function(){mettreErreurDevant(type, id);};
+		        div1.onmouseout = function(){enleverErreurDevant(type, id);};
+		        }
+
+		    if (type !== 'acce') {
+		        //if collisions > 0 -> descendre(nom)
+		        var nouvellesCollisions = collisions(type+id, objetErreurs[type+id].niveau);
+		            if (nouvellesCollisions.length > 0) {
+		                    for (var i=0; i < nouvellesCollisions.length; i++) {
+		                        descendreErreur(nouvellesCollisions[i]);            
+		                    }
+		                }
+		    }
+		    
+		    
+		    //hover sur spans
+		    var spans = divTexte.getElementsByClassName(type+id);
+		    for (var i=0; i < spans.length; i++) {
+		       for (var i=0; i < spans.length; i++) {
+		        spans[i].addEventListener('mouseover', function(event) {event.stopPropagation();mettreErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4));},false);
+		        spans[i].addEventListener('mouseout', function(event) {event.stopPropagation();enleverErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4), event.target.classList[0].slice(4));},false);
+		    
+		        }
+		    }
+		    
+		} //fin creerSouligner
+
+	//détecte s'il y a des collisions d'une erreur (nom) avec d'autres erreurs de type souligné au niveau donné:
+		//retourne un array des noms d'erreurs
+		function collisions(nom, niveau) {
+		    var spans = divTexte.getElementsByClassName(nom);  
+		    var autresErreurs = [];
+		    for (var i=0; i < spans.length; i++) {
+		        //vérifier tous les parents SPAN
+		        var element = spans[i].parentElement; //erreur si H3
+		        while (element !== divTexte) {
+		            if (element.nodeName === 'SPAN') {
+		                var elementNomErreur = element.classList[0];
+		                var elementType = elementNomErreur.substr(0,4);
+		                if (elementType === 'voyo' || elementType === 'voyn' || elementType === 'svoy' || elementType === 'cons') {
+		                    if (objetErreurs[elementNomErreur].niveau === niveau) {
+		                        if (autresErreurs.indexOf(elementNomErreur) === -1) {
+		                            autresErreurs.push(elementNomErreur);
+		                        }
+		                    }
+		                }
+		            }
+		            element = element.parentElement;
+		        }
+		        //vérifier tous les enfants SPAN
+		        var sousSpans = spans[i].getElementsByTagName('span');
+		        for (var j=0; j < sousSpans.length; j++) {
+		        if (sousSpans[j].nodeName === 'SPAN') {
+		            var elementNomErreur = sousSpans[j].classList[0];
+		            var elementType = elementNomErreur.substr(0,4);
+		                if (elementType === 'voyo' || elementType === 'voyn' || elementType === 'svoy' || elementType === 'cons') {
+		                    if (objetErreurs[elementNomErreur].niveau === niveau) {
+		                        if (autresErreurs.indexOf(elementNomErreur) === -1) {
+		                            autresErreurs.push(elementNomErreur);
+		                        }
+		                    }
+		                }
+		           }
+		        }
+		    }
+		    return autresErreurs;
+		}
+
+
+		function descendreErreur(nom) {
+		    //descend l'erreur de 6px:
+		    if ('div0' in objetErreurs[nom]) {
+		        var top = objetErreurs[nom].div0.offsetTop;
+		        objetErreurs[nom].div0.style.top = top + 6 + "px";
+		        }
+		     if ('div1' in objetErreurs[nom]) {
+		        var top = objetErreurs[nom].div1.offsetTop;
+		        objetErreurs[nom].div1.style.top = top + 6 + "px";
+		        }
+		    //change le niveau
+		    objetErreurs[nom].niveau++;
+		    //vérifie s'il y a des collisions si niveau < 3
+		    if (objetErreurs[nom].niveau < 3) {
+		        //s'il y a de nouvelles collisions à ce niveau-là:
+		        var nouvellesColisions = collisions(nom, objetErreurs[nom].niveau);   
+		        if (nouvellesColisions.length > 0) {
+		            for (var i=0; i < nouvellesColisions.length; i++) {
+		                descendreErreur(nouvellesColisions[i]);
+		            }
+		        }
+		    }
+		}
+
+
+
+
+
+		function monterErreur(nom) {
+		    if (objetErreurs[nom].niveau > 1) {
+		        if ('div0' in objetErreurs[nom]) {
+		        var top = objetErreurs[nom].div0.offsetTop;
+		        objetErreurs[nom].div0.style.top = top - 6 + "px";
+		        }
+		     if ('div1' in objetErreurs[nom]) {
+		        var top = objetErreurs[nom].div1.offsetTop;
+		        objetErreurs[nom].div1.style.top = top - 6 + "px";
+		        }
+		    //change le niveau
+		    objetErreurs[nom].niveau--;
+		        
+		        //vérifie s'il y a des erreurs en dessous qu'on pourrait faire monter
+		        var erreursDessous = collisions(nom, objetErreurs[nom].niveau+2);
+		        if (erreursDessous.length > 0) {
+		            for (var i=0; i < erreursDessous.length; i++) {
+		                //vérifier s'il y aurait des collisions pour le niveau juste en haut
+		                if (collisions(erreursDessous[i], objetErreurs[erreursDessous[i]].niveau-1).length === 0) {
+		                    monterErreur(erreursDessous[i]);
+		                }   
+		            }
+		        }
+		        
+		        //une fois qu'on est monté, on peut aussi vérifier une autre fois si la voie est libre en haut:
+		        //ex: si on efface une erreur de niveau 2 (retenue par niveau 1) qui retient une erreur de niveau 3
+		        if (objetErreurs[nom].niveau > 1) {
+		            var erreursDessus = collisions(nom, objetErreurs[nom].niveau-1);
+		            if (erreursDessus.length === 0) {
+		            monterErreur(nom);
+		            }
+		        }
+		    }
+		}	
+
+		function creerLettreMuette(type, id) {
+		    //console.log("lettre muette "+type+" "+id);
+		    
+		    var divContenantTop = divContenant.getBoundingClientRect().top;    
+		    var divContenantLeft = divContenant.getBoundingClientRect().left;
+		    var scrollTop = divContenant.scrollTop;
+		    var span = divTexte.getElementsByClassName(type+id)[0];
+		    var hauteur =  4;
+		    var hauteurLigne = 1.5;
+		    var div0 = document.createElement('div');
+		    div0.style.position = 'absolute';
+		    div0.id = type+id+'_'+0;
+		    div0.style.width = span.offsetWidth + 'px';
+		    div0.style.height = span.offsetHeight + 'px';
+		    div0.style.left = span.offsetLeft + 'px';
+		    div0.style.top = span.offsetTop - span.offsetHeight+hauteur +'px';
+		    div0.textContent = span.textContent;
+		    div0.classList.add('lettre_muette');
+		    div0.style.lineHeight = hauteurLigne;
+		    div0.style.fontSize = '28px';
+		    divContenant.appendChild(div0);
+		    
+		    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		    svg.setAttribute("preserveAspectRatio", "none");
+		    svg.setAttribute("width","100%");
+		    svg.setAttribute("height","100%");
+		    svg.style.left= 0;
+		    svg.style.top=0;
+		    svg.style.position="absolute";
+		    div0.appendChild(svg);
+
+		    var ligne = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+		    ligne.setAttribute("stroke","red");
+		    ligne.setAttribute("stroke-width","2");
+		    ligne.setAttribute('x1',span.offsetWidth*1);
+		    ligne.setAttribute('y1',span.offsetHeight*0.6);
+		    ligne.setAttribute('x2',span.offsetWidth*0);
+		    ligne.setAttribute('y2',span.offsetHeight*0.77);
+		    svg.appendChild(ligne);
+		    
+		    //rentrer la div dans objetErreurs:
+		    objetErreurs[type+id].div0 = div0;
+		    
+		    //rightclick:
+		    div0.oncontextmenu = function(event) {
+		        ouvrirFenetreSupprimer(event.target);
+		        }
+		    div0.onmouseover = function(){mettreErreurDevant(type, id);};
+		    div0.onmouseout = function(){enleverErreurDevant(type, id);};
+		    
+		    //hover sur spans
+		    var spans = divTexte.getElementsByClassName(type+id);
+		    for (var i=0; i < spans.length; i++) {
+		       for (var i=0; i < spans.length; i++) {
+		            spans[i].addEventListener('mouseover', function(event) {event.stopPropagation();mettreErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4));},false);
+		            spans[i].addEventListener('mouseout', function(event) {event.stopPropagation();enleverErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4), event.target.classList[0].slice(4));},false);
+
+		        }
+		    }
+		}
+
+
+		//Mettre erreur en évidence par rapport aux autres
+		function mettreErreurDevant (type, id) {
+		    //console.log("mettreErreurDevant:"+type+id);
+		    //Il faut mettre la classe 'type' sur les enfants
+		    var spans = divTexte.getElementsByClassName(type+id);
+		    for (var i=0; i < spans.length; i++) {
+		        spans[i].classList.add(type);
+		        var sousSpans = spans[i].getElementsByTagName('span');
+		        for (var j=0; j < sousSpans.length; j++) {
+		            sousSpans[j].classList.add(type);
+		        }
+		    }
+		    objetErreurs[type+id].div0.classList.add('en_avant');
+		    if ('div1' in objetErreurs[type+id]) {
+		        objetErreurs[type+id].div1.classList.add('en_avant');
+		    }
+		    if ('div2' in objetErreurs[type+id]) {
+		        objetErreurs[type+id].div2.classList.add('en_avant');
+		    } 
+		}
+		    
+		
+		function enleverErreurDevant(type, id) {
+		    //Il faut mettre la classe 'type' sur les enfants
+		    var spans = divTexte.getElementsByClassName(type+id);
+		    for (var i=0; i < spans.length; i++) {
+		        spans[i].classList.remove(type);
+		        var sousSpans = spans[i].getElementsByTagName('span');
+		        for (var j=0; j < sousSpans.length; j++) {
+		            sousSpans[j].classList.remove(type);
+		        }
+		    }
+		    objetErreurs[type+id].div0.classList.remove('en_avant');
+		    if ('div1' in objetErreurs[type+id]) {
+		        objetErreurs[type+id].div1.classList.remove('en_avant');
+		    }
+		    if ('div2' in objetErreurs[type+id]) {
+		        objetErreurs[type+id].div2.classList.remove('en_avant');
+		    }
+		}
+
+
+
+		function ouvrirFenetreSupprimer(cible) {
+			console.log("ouvrirFenetreSupprimer");
+		    if (fenetreSupprimer.offsetParent) {fermerFenetreSupprimer();}
+
+		    
+
+		    //remonte jusqu'à trouver la DIV qui contient le svg
+		    while (cible.nodeName == "svg" || cible.nodeName == "path" || cible.nodeName == "polygon" || cible.nodeName == "clipPath" || cible.nodeName == "rect" || cible.nodeName == "circle" || cible.nodeName == "line") {
+		        cible = cible.parentNode;
+		    }
+		    console.log("cible:");
+		    console.log(cible);
+
+		    fenetreSupprimer.style.top = cible.getBoundingClientRect().bottom + 10 + "px";
+		    fenetreSupprimer.style.left = cible.getBoundingClientRect().right + 10 + "px";
+		    
+		    if (fenetreSupprimer.offsetLeft+fenetreSupprimer.offsetWidth > divContenant.offsetWidth+divContenant.offsetLeft) {
+		        fenetreSupprimer.style.left = cible.getBoundingClientRect().left - fenetreSupprimer.offsetLeft -30 + "px";
+		    }
+		    
+		    fenetreSupprimer.style.visibility = "visible";
+		   	creerExercice.target = cible;
+		   	console.log("cible");
+		   	console.log(cible);
+		   	console.log("target");
+		   	console.log(target);
+		    }
+		   
+	
+
+		function fermerFenetreSupprimer() {
+		    if (fenetreSupprimer.offsetParent) {
+		    	fenetreSupprimer.style.left = "0";
+				fenetreSupprimer.style.top = "0";
+		        fenetreSupprimer.style.visibility = "hidden";
+		    }
+		    if (creerExercice.sel) {creerExercice.sel.removeAllRanges();};
+		    creerExercice.currentRange = null;
+		}
+
+		function supprimerErreur(element) {
+		    var nomErreur = element.id.slice(0,-2);
+		    var typeErreur = nomErreur.substr(0,4);
+		    var spans = document.getElementsByClassName(nomErreur);
+		    console.log("nomErreur");
+		    console.log(nomErreur);
+		    console.log("objetErreurs");
+		    console.log(objetErreurs);
+		    console.log("compteurErreurs");
+		    console.log(compteurErreurs);
+		    if ('div0' in objetErreurs[nomErreur]) {
+		        divContenant.removeChild(objetErreurs[nomErreur]['div0']);
+		    }
+		    if ('div1' in objetErreurs[nomErreur]) {
+		        divContenant.removeChild(objetErreurs[nomErreur]['div1']);
+		    }
+		    if ('div2' in objetErreurs[nomErreur]) {
+		        divContenant.removeChild(objetErreurs[nomErreur]['div2']);
+		    }
+		    
+		    //si l'élément est 'voyo', 'voyn', 'svoy' ou 'cons', il faut vérifier quels éléments
+		    if (typeErreur === 'voyo' || typeErreur === 'voyn' || typeErreur === 'svoy' || typeErreur === 'cons') {
+		        if (objetErreurs[nomErreur].niveau < 3) {
+		            var erreursDessous = collisions(nomErreur, objetErreurs[nomErreur].niveau+1);
+		            //nullifier le niveau de l'erreur à supprimer pour qu'il ne matche plus avec rien
+		            objetErreurs[nomErreur].niveau = -1;
+		            if (erreursDessous.length > 0) {
+		                for (var i=0; i < erreursDessous.length; i++) {
+		                    //vérifier s'il y aurait des collisions pour le niveau juste en haut
+		                    if (collisions(erreursDessous[i], objetErreurs[erreursDessous[i]].niveau-1).length === 0) {
+		                        monterErreur(erreursDessous[i]);
+		                    }
+		                }
+		            }        
+		        }
+		    }
+
+		    //ne conserve pas tous les event listeners non plus...
+		    for (var i=spans.length-1; i >= 0; i--) {
+		        var parent = spans[i].parentNode;
+		        // move all children out of the element
+		        while (spans[i].firstChild) {
+		            var elementToInsert = spans[i].firstChild;
+		            parent.insertBefore(elementToInsert, spans[i]);
+		            //remettre event listeners
+		            elementToInsert.addEventListener('mouseover', function(event) {event.stopPropagation();mettreErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4));},false);
+		            elementToInsert.addEventListener('mouseout', function(event) {event.stopPropagation();enleverErreurDevant(event.target.classList[0].substr(0,4), event.target.classList[0].slice(4), event.target.classList[0].slice(4));},false);
+		        };
+		        // remove the empty element
+		        parent.removeChild(spans[i]); 
+		    }
+		    
+		    //effacer la clé dans objetErreurs:
+		    delete objetErreurs[nomErreur];
+		    fermerFenetreSupprimer();
+		}
+
+
+		divTexte.onkeydown = function(event) {
+			rafraichirDelai();
+			
+		}
+
+		divTexte.addEventListener("paste", function(e) {
+		    e.preventDefault();
+		    return false;
+		});
+
+
+		function rafraichirDelai() {    
+		    clearTimeout(delai);
+		    delai = setTimeout(toutRedessiner, 500);
+		}
+
+		//Pour rendre variables accessibles dans le contexte global:
+		return {
+			sel: window.getSelection(),
+			fenetreSupprimer: fenetreSupprimer,
+			currentRange: currentRange,
+			fenetreOptions: fenetreOptions,
+			surroundErreur: surroundErreur,
+			objetErreurs: objetErreurs,
+			compteurErreurs: compteurErreurs,
+			supprimerErreur:supprimerErreur
+
+		}
+	}();
+
+
+
+</script>
