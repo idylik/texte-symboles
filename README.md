@@ -7,3 +7,4 @@ Creating a Rich-text editor in HTML using JavaScript is a complex task because i
 
 The comments and variable names in the code are in French.
 
+Basically, when you select characters and choose a type of error, it inserts a span around the selected characters, and then computes the width, height, X and Y position to instantiate an appropriate SVG on top of the characters.
