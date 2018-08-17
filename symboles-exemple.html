@@ -35,6 +35,8 @@
 
 <script>
 
+	/* A lot of variable names and comments are in french. */
+
 	//Pour ne pas contaminer le contexte global avec des variables:
 	var creerExercice = function () {
 		var divContenant = document.getElementById('divContenant');
@@ -93,7 +95,6 @@
 		/* Ouvrir et fermer fenêtres */
 
 		function ouvrirFenetreOptions(x, y) {
-			//console.log("X:"+x+" Y:"+y);
 			var offsetX = 10;
 			var offsetY = 25;
 
@@ -146,7 +147,6 @@
 
 			//Erreur sur plus de deux lignes:
 			if (creerExercice.currentRange.getBoundingClientRect().height > Math.ceil(lineHeight*2)) {
-		        console.log("Erreur sur plus de 2 lignes.");
 		        fermerFenetreOptions();
 		        return;
     			}
@@ -156,7 +156,6 @@
 			//Return si moins de 3 caractères pour liaison/enchainement:
 		    if (type === 'liob' || type === 'liin' || type === 'ench') {
 		        if (creerExercice.currentRange.toString().length < 3 ) {
-		            console.log("Moins que 3 caractères.");
 		            fermerFenetreOptions();
 		            return;
 		        }
@@ -165,15 +164,14 @@
 			//Return si moins de 2 caractères pour intonation mont/desc
 		    if (type === 'intm' || type === 'intd') {
 		        if (creerExercice.currentRange.toString().length < 2) {
-		            console.log("L'intonation doit comprendre au moins 2 caractères.");
 		            fermerFenetreOptions();
 		            return;
 		        }
 		    }
 
 		    if (type === 'lemu'){
+		    	//On peut seulement sélectionner une lettre muette à la fois
 		        if (creerExercice.currentRange.toString().length > 1) {
-		            console.log("Sélectionner une lettre à la fois");
 		            fermerFenetreOptions();
 		            return;
 		            if (!creerExercice.currentRange.toString().match(/[A-Za-z0-9\u00C0-\u00ff]/i) ) {
@@ -187,13 +185,10 @@
 		    if (creerExercice.currentRange != null) {
         
 		        //Si les nodes du début ou de la fin sont contenues dans d'autres nodes qu'il est possible de sélectionner au complet (car le contenu est sélectionné au complet):
-		        //console.log("Encadre erreur");
 	            var copieRange = creerExercice.currentRange.cloneRange();
 	            var newSpan = document.createElement('span');
 	            var fragment = creerExercice.currentRange.extractContents();
 	            for (var i=0; i < fragment.childNodes.length; i++) {
-	                //console.log(fragment.childNodes[i]);
-	                //clone, sinon les nodes vont disparaitre au fur et à mesure et ça va causer des erreurs
 	                newSpan.appendChild(fragment.childNodes[i].cloneNode(true));
 	            }
 	            creerExercice.currentRange.insertNode(newSpan);
@@ -214,7 +209,6 @@
 	            }
         
         }
-	    //console.log("fin de surroundErreur");
 	    fermerFenetreOptions();
 
 		}
@@ -249,7 +243,6 @@
 		                if (!el.childNodes[i].hasChildNodes()) { //si aucun childNode
 		                    if (el.childNodes[i].nodeName == '#text') {
 		                    result.push(el.childNodes[i]);
-		                        //console.log(el.childNodes[i].nodeValue);
 		                    } else {continue;}
 		                } else { //s'il a des childnodes, recommencer pushChildren
 		                    pushChildren(el.childNodes[i]);
@@ -290,8 +283,6 @@
 		        if (premierRangeErreur === -1) {
 		            continue;
 		        } else {
-		            //console.log("index textnode:"+i);
-		            //console.log(premierRangeErreur.toString());
 		            return premierRangeErreur;
 		        }
 		    }
@@ -307,7 +298,6 @@
 		    //retourne le premier RANGE non-nul, sinon retourne -1 (si node vide ou pas trouvé dedans):
 		    //fonction récursive
 		    function dernierRangeNonNulNode(textNode, pos) {
-		        //console.log(pos);
 		        if (textNode.length === 0) {
 		            return -1;
 		        }
@@ -410,9 +400,6 @@
 
 		//réinsère tout le texte dans divTexte, re-lit tout le contenu, efface les svg, recrée objetErreurs et redessine tout
 		function toutRedessiner() {
-		        console.log("********tout redessiner********")
-		        
-		        //console.log("refresh erreurs");
 		        //clear objetErreurs:
 		        objetErreurs = {};
 		        compteurErreurs = 0;
@@ -485,7 +472,6 @@
 		    
 		    //erreur sur une ligne
 		    if (premierRangeBottom === dernierRangeBottom) {
-		        console.log("Erreur sur 1 ligne.");
 		        
 		        widthTotale = dernierRangeLeft - premierRangeLeft - premierRangeWidth/2 + dernierRangeWidth/2;
 		        
@@ -527,8 +513,7 @@
 		        objetErreurs[type+id].div0 = div0;
 		        
 		    } else {
-		    //erreur pas sur la même ligne
-		        console.log("Erreur sur deux lignes.");
+		    //erreur sur deux lignes
 		        //Trouver le dernierCaractere de la premier ligne
 		        lineBreak = boutDeLigne(premierRange, premierRangeBottom, dernierRange, dernierRangeBottom, flattenedArray);
 		        
@@ -687,7 +672,6 @@
 		    if (svg) {
 		        svg.style.cursor = 'default';
 		        svg.oncontextmenu = function(event) {
-		            //console.log(event);
 		            ouvrirFenetreSupprimer(event.target);
 		        }
 		        svg.onmouseover = function(){mettreErreurDevant(type, id);}
@@ -732,7 +716,6 @@
 
 
 		function creerIntonation(type, id) {
-		    //console.log("intonation "+type+" "+id);
 		    var divContenantTop = divContenant.getBoundingClientRect().top;    
 		    var divContenantLeft = divContenant.getBoundingClientRect().left;
 		    
@@ -921,7 +904,6 @@
 		} //fin creerIntonation
 
 		function creerSouligner(type, id) {
-		    //console.log("souligner "+type+" "+id);
 		    var hauteur = 4;
 		    var epaisseur = 4;
 		    var couleur;
@@ -977,11 +959,7 @@
 		        //.right est .left + .width, PAS la distance à partir de la droite!
 		        var premiereLigneWidth = lineBreak.finPremiere.getBoundingClientRect().right - premierRangeLeft;        
 		        var derniereLigneWidth = dernierRangeRight - lineBreak.debutDeuxieme.getBoundingClientRect().left;
-		        
-		        //console.log("dernierRange.getBoundingClientRect().right");
-		        //console.log(dernierRange.getBoundingClientRect().right);
-		        //console.log("lineBreak.debutDeuxieme.getBoundingClientRect().left");
-		        //console.log(lineBreak.debutDeuxieme.getBoundingClientRect().left);
+
 		        widthTotale = premiereLigneWidth + derniereLigneWidth;
 		        
 		        //première partie:
@@ -1163,7 +1141,6 @@
 		}	
 
 		function creerLettreMuette(type, id) {
-		    //console.log("lettre muette "+type+" "+id);
 		    
 		    var divContenantTop = divContenant.getBoundingClientRect().top;    
 		    var divContenantLeft = divContenant.getBoundingClientRect().left;
@@ -1226,7 +1203,7 @@
 
 		//Mettre erreur en évidence par rapport aux autres
 		function mettreErreurDevant (type, id) {
-		    //console.log("mettreErreurDevant:"+type+id);
+
 		    //Il faut mettre la classe 'type' sur les enfants
 		    var spans = divTexte.getElementsByClassName(type+id);
 		    for (var i=0; i < spans.length; i++) {
@@ -1268,17 +1245,12 @@
 
 
 		function ouvrirFenetreSupprimer(cible) {
-			console.log("ouvrirFenetreSupprimer");
 		    if (fenetreSupprimer.offsetParent) {fermerFenetreSupprimer();}
-
-		    
 
 		    //remonte jusqu'à trouver la DIV qui contient le svg
 		    while (cible.nodeName == "svg" || cible.nodeName == "path" || cible.nodeName == "polygon" || cible.nodeName == "clipPath" || cible.nodeName == "rect" || cible.nodeName == "circle" || cible.nodeName == "line") {
 		        cible = cible.parentNode;
 		    }
-		    console.log("cible:");
-		    console.log(cible);
 
 		    fenetreSupprimer.style.top = cible.getBoundingClientRect().bottom + 10 + "px";
 		    fenetreSupprimer.style.left = cible.getBoundingClientRect().right + 10 + "px";
@@ -1289,10 +1261,7 @@
 		    
 		    fenetreSupprimer.style.visibility = "visible";
 		   	creerExercice.target = cible;
-		   	console.log("cible");
-		   	console.log(cible);
-		   	console.log("target");
-		   	console.log(target);
+
 		    }
 		   
 	
@@ -1311,12 +1280,7 @@
 		    var nomErreur = element.id.slice(0,-2);
 		    var typeErreur = nomErreur.substr(0,4);
 		    var spans = document.getElementsByClassName(nomErreur);
-		    console.log("nomErreur");
-		    console.log(nomErreur);
-		    console.log("objetErreurs");
-		    console.log(objetErreurs);
-		    console.log("compteurErreurs");
-		    console.log(compteurErreurs);
+
 		    if ('div0' in objetErreurs[nomErreur]) {
 		        divContenant.removeChild(objetErreurs[nomErreur]['div0']);
 		    }
